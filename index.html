@@ -4,9 +4,801 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Customizable Timer</title>
-<meta http-equiv="refresh" content="0; url=https://cdn.jsdelivr.net/gh/betabeeswax/customizable-timer@main/timer.html" />
+<style>
+  :root {
+    --bg: #0c0f14;
+    --panel: #151a22;
+    --border: #2a3344;
+    --text: #eef2f7;
+    --muted: #9aa6b2;
+    --accent: #5b9fd4;
+    --danger: #e85d5d;
+    --display: #ffffff;
+    --display-size: 72px;
+    --font: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; font-family: var(--font);
+    background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column;
+  }
+  body.flash { animation: flashBg 0.5s ease 4; }
+  @keyframes flashBg {
+    0%, 100% { background: var(--bg); }
+    50% { background: #3a1520; }
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    gap: 8px; flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tab {
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    border-radius: 999px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 0.85rem;
+  }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #0b1220; font-weight: 700; }
+  main {
+    flex: 1; display: grid; grid-template-columns: 1fr minmax(280px, 340px); min-height: 0;
+  }
+  @media (max-width: 840px) { main { grid-template-columns: 1fr; } }
+  .stage {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px 16px; gap: 16px; min-height: 360px;
+  }
+  .label-display {
+    font-size: 1rem; color: var(--muted); letter-spacing: 0.04em;
+    text-transform: uppercase; min-height: 1.2em;
+  }
+  .time {
+    font-variant-numeric: tabular-nums; font-size: var(--display-size); font-weight: 700;
+    color: var(--display); line-height: 1; letter-spacing: 0.02em; user-select: none;
+  }
+  .time.danger { color: var(--danger); }
+  .subtime { color: var(--muted); font-size: 0.95rem; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  button {
+    font: inherit; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text); padding: 10px 16px; cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #0b1220; font-weight: 700; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .side {
+    border-left: 1px solid var(--border); background: #10141b;
+    padding: 14px; overflow-y: auto; max-height: 100vh;
+  }
+  @media (max-width: 840px) {
+    .side { border-left: 0; border-top: 1px solid var(--border); max-height: none; }
+  }
+  .side h2 {
+    margin: 16px 0 10px; font-size: 0.75rem; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted);
+  }
+  .side h2:first-child { margin-top: 0; }
+  .mode-panel { display: none; }
+  .mode-panel.active { display: block; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+  .field input[type="text"], .field input[type="number"], .field select {
+    width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text); font: inherit;
+  }
+  .field input[type="color"] {
+    width: 100%; height: 36px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); padding: 2px;
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .presets button { padding: 6px 10px; font-size: 0.8rem; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; margin: 8px 0; }
+  .check input { width: 16px; height: 16px; }
+  .hint { font-size: 0.75rem; color: var(--muted); line-height: 1.35; }
+  body.focus-mode header,
+  body.focus-mode .side,
+  body.focus-mode #startBtn,
+  body.focus-mode #pauseBtn,
+  body.focus-mode #resetBtn,
+  body.focus-mode #fsBtn { display: none !important; }
+  body.focus-mode main {
+    display: flex; grid-template-columns: none; min-height: 100vh; height: 100vh;
+  }
+  body.focus-mode .stage {
+    flex: 1; width: 100%; min-height: 100vh; height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 4vh 4vw; gap: 2.5vh;
+  }
+  body.focus-mode .time { font-size: clamp(96px, 24vw, 240px) !important; line-height: 1; }
+  body.focus-mode .label-display { font-size: clamp(1rem, 3vw, 1.6rem); }
+  body.focus-mode .subtime { font-size: clamp(0.95rem, 2.5vw, 1.35rem); }
+  #backBtn {
+    display: none; border: 1px solid var(--border); background: rgba(20,24,32,0.85);
+    color: var(--text); border-radius: 999px; padding: 10px 20px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  body.focus-mode #backBtn { display: inline-flex; }
+  #backBtn:hover { border-color: var(--accent); color: var(--accent); }
+</style>
 </head>
 <body>
-<p>Loading timer… If this does not open, use the GitHub raw timer.html file.</p>
+  <header>
+    <h1>Customizable Timer</h1>
+    <div class="tabs">
+      <button class="tab active" data-mode="countdown" type="button">Countdown</button>
+      <button class="tab" data-mode="stopwatch" type="button">Stopwatch</button>
+      <button class="tab" data-mode="pomodoro" type="button">Pomodoro</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="stage">
+      <div class="label-display" id="labelShow">Timer</div>
+      <div class="time" id="display">05:00</div>
+      <div class="subtime" id="sub">Ready</div>
+      <div class="controls">
+        <button class="primary" id="startBtn" type="button">Start</button>
+        <button id="pauseBtn" type="button" disabled>Pause</button>
+        <button id="resetBtn" type="button">Reset</button>
+        <button id="fsBtn" type="button">Fullscreen timer</button>
+        <button id="backBtn" type="button">← Back</button>
+      </div>
+    </section>
+
+    <aside class="side">
+      <!-- COUNTDOWN SETTINGS -->
+      <div class="mode-panel active" id="panel-countdown">
+        <h2>Countdown time</h2>
+        <div class="grid3 field">
+          <div>
+            <label>Hours</label>
+            <input type="number" id="cd-hours" min="0" max="99" value="0" />
+          </div>
+          <div>
+            <label>Minutes</label>
+            <input type="number" id="cd-minutes" min="0" max="59" value="5" />
+          </div>
+          <div>
+            <label>Seconds</label>
+            <input type="number" id="cd-seconds" min="0" max="59" value="0" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Milliseconds (0–999)</label>
+          <input type="number" id="cd-ms" min="0" max="999" value="0" />
+        </div>
+        <div class="field">
+          <label>Presets</label>
+          <div class="presets">
+            <button type="button" data-cd-preset="10000">10s</button>
+            <button type="button" data-cd-preset="30000">30s</button>
+            <button type="button" data-cd-preset="60000">1m</button>
+            <button type="button" data-cd-preset="180000">3m</button>
+            <button type="button" data-cd-preset="300000">5m</button>
+            <button type="button" data-cd-preset="600000">10m</button>
+            <button type="button" data-cd-preset="1500000">25m</button>
+            <button type="button" data-cd-preset="3600000">1h</button>
+          </div>
+        </div>
+        <h2>Countdown options</h2>
+        <label class="check"><input type="checkbox" id="cd-showMs" /> Show milliseconds</label>
+        <label class="check"><input type="checkbox" id="cd-soundOn" checked /> Sound when done</label>
+        <label class="check"><input type="checkbox" id="cd-flashOn" checked /> Flash when done</label>
+        <label class="check"><input type="checkbox" id="cd-tickOn" /> Tick each second</label>
+        <label class="check"><input type="checkbox" id="cd-repeat" /> Repeat timer (off by default)</label>
+        <div class="field">
+          <label>Done sound</label>
+          <select id="cd-sound">
+            <option value="beep">Classic beeps</option>
+            <option value="chime">Chime</option>
+            <option value="alarm">Alarm pulse</option>
+            <option value="digital">Digital blip</option>
+            <option value="soft">Soft bell</option>
+            <option value="siren">Siren</option>
+            <option value="coin">Coin</option>
+            <option value="double">Double hit</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Volume</label>
+          <input type="range" id="cd-volume" min="0" max="100" value="70" style="width:100%" />
+        </div>
+        <div class="field">
+          <label>Label</label>
+          <input type="text" id="cd-label" value="Countdown" maxlength="40" />
+        </div>
+      </div>
+
+      <!-- STOPWATCH SETTINGS -->
+      <div class="mode-panel" id="panel-stopwatch">
+        <h2>Stopwatch options</h2>
+        <label class="check"><input type="checkbox" id="sw-showMs" /> Show milliseconds</label>
+        <label class="check"><input type="checkbox" id="sw-soundOn" /> Sound on start/stop</label>
+        <label class="check"><input type="checkbox" id="sw-tickOn" /> Tick each second</label>
+        <div class="field">
+          <label>Click sound</label>
+          <select id="sw-sound">
+            <option value="digital">Digital blip</option>
+            <option value="beep">Classic beep</option>
+            <option value="soft">Soft bell</option>
+            <option value="coin">Coin</option>
+            <option value="double">Double hit</option>
+            <option value="chime">Chime</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Volume</label>
+          <input type="range" id="sw-volume" min="0" max="100" value="50" style="width:100%" />
+        </div>
+        <div class="field">
+          <label>Label</label>
+          <input type="text" id="sw-label" value="Stopwatch" maxlength="40" />
+        </div>
+        <p class="hint">Stopwatch counts up from 0. Milliseconds update smoothly while running.</p>
+      </div>
+
+      <!-- POMODORO SETTINGS -->
+      <div class="mode-panel" id="panel-pomodoro">
+        <h2>Pomodoro times</h2>
+        <div class="grid2 field">
+          <div>
+            <label>Work (min)</label>
+            <input type="number" id="pm-workMin" min="1" max="120" value="25" />
+          </div>
+          <div>
+            <label>Break (min)</label>
+            <input type="number" id="pm-breakMin" min="1" max="60" value="5" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Milliseconds (extra on work/break)</label>
+          <input type="number" id="pm-ms" min="0" max="999" value="0" />
+        </div>
+        <label class="check"><input type="checkbox" id="pm-autoNext" checked /> Auto-switch work/break</label>
+        <label class="check"><input type="checkbox" id="pm-showMs" /> Show milliseconds</label>
+        <label class="check"><input type="checkbox" id="pm-soundOn" checked /> Sound when done</label>
+        <label class="check"><input type="checkbox" id="pm-flashOn" checked /> Flash when done</label>
+        <label class="check"><input type="checkbox" id="pm-tickOn" /> Tick each second</label>
+        <div class="field">
+          <label>Work done sound</label>
+          <select id="pm-soundWork">
+            <option value="chime">Chime</option>
+            <option value="beep">Classic beeps</option>
+            <option value="alarm">Alarm pulse</option>
+            <option value="soft">Soft bell</option>
+            <option value="double">Double hit</option>
+            <option value="siren">Siren</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Break done sound</label>
+          <select id="pm-soundBreak">
+            <option value="soft">Soft bell</option>
+            <option value="chime">Chime</option>
+            <option value="coin">Coin</option>
+            <option value="digital">Digital blip</option>
+            <option value="beep">Classic beeps</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Volume</label>
+          <input type="range" id="pm-volume" min="0" max="100" value="70" style="width:100%" />
+        </div>
+        <div class="field">
+          <label>Work label</label>
+          <input type="text" id="pm-labelWork" value="Work" maxlength="40" />
+        </div>
+        <div class="field">
+          <label>Break label</label>
+          <input type="text" id="pm-labelBreak" value="Break" maxlength="40" />
+        </div>
+      </div>
+
+      <h2>Look (all modes)</h2>
+      <div class="grid2 field">
+        <div>
+          <label>Background</label>
+          <input type="color" id="bgColor" value="#0c0f14" />
+        </div>
+        <div>
+          <label>Panel</label>
+          <input type="color" id="panelColor" value="#151a22" />
+        </div>
+        <div>
+          <label>Time color</label>
+          <input type="color" id="textColor" value="#ffffff" />
+        </div>
+        <div>
+          <label>Accent</label>
+          <input type="color" id="accentColor" value="#5b9fd4" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Customize time size: <span id="sizeVal">72</span>px</label>
+        <input type="range" id="fontSize" min="36" max="160" value="72" style="width:100%" />
+      </div>
+      <div class="field">
+        <label>Font</label>
+        <select id="fontPick">
+          <option value="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">System</option>
+          <option value="Georgia, 'Times New Roman', serif">Serif</option>
+          <option value="'Courier New', Courier, monospace">Mono</option>
+          <option value="Arial Black, Arial, sans-serif">Bold Sans</option>
+          <option value="Trebuchet MS, sans-serif">Trebuchet</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button type="button" id="saveTheme">Save settings</button>
+        <button type="button" id="resetTheme">Reset look</button>
+        <button type="button" id="testSound">Test sound</button>
+      </div>
+      <p class="hint" style="margin-top:12px">
+        Each mode keeps its own times, sounds, and options. Start opens fullscreen timer + Back.
+      </p>
+    </aside>
+  </main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const display = $("display");
+  const sub = $("sub");
+  const labelShow = $("labelShow");
+
+  let mode = "countdown";
+  let running = false;
+  let raf = null;
+  let endAt = 0;
+  let remainMs = 5 * 60 * 1000;
+  let swElapsed = 0;
+  let swStarted = 0;
+  let pomoWork = true;
+
+  function ac() {
+    if (!window._ac) window._ac = new (window.AudioContext || window.webkitAudioContext)();
+    return window._ac;
+  }
+
+  function tone(freq, dur, type, vol, when = 0) {
+    try {
+      const ctx = ac();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const t0 = ctx.currentTime + when;
+      osc.type = type || "sine";
+      osc.frequency.value = freq;
+      gain.gain.value = Math.max(0.001, vol * 0.22);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t0);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      osc.stop(t0 + dur + 0.02);
+    } catch (e) {}
+  }
+
+  function playPattern(name, volumePct) {
+    const v = (Number(volumePct) || 70) / 100;
+    if (name === "beep") {
+      tone(660, 0.12, "sine", v, 0);
+      tone(880, 0.14, "sine", v, 0.16);
+      tone(990, 0.2, "sine", v, 0.34);
+    } else if (name === "chime") {
+      tone(523, 0.35, "sine", v, 0);
+      tone(659, 0.35, "sine", v, 0.08);
+      tone(784, 0.5, "sine", v, 0.16);
+    } else if (name === "alarm") {
+      for (let i = 0; i < 6; i++) tone(880 + (i % 2) * 120, 0.1, "square", v * 0.8, i * 0.14);
+    } else if (name === "digital") {
+      tone(1200, 0.05, "square", v, 0);
+      tone(1500, 0.05, "square", v, 0.07);
+    } else if (name === "soft") {
+      tone(440, 0.5, "sine", v * 0.7, 0);
+      tone(554, 0.55, "sine", v * 0.5, 0.12);
+    } else if (name === "siren") {
+      tone(600, 0.25, "sawtooth", v * 0.5, 0);
+      tone(900, 0.25, "sawtooth", v * 0.5, 0.25);
+      tone(600, 0.25, "sawtooth", v * 0.5, 0.5);
+      tone(900, 0.25, "sawtooth", v * 0.5, 0.75);
+    } else if (name === "coin") {
+      tone(988, 0.08, "square", v, 0);
+      tone(1319, 0.25, "square", v, 0.08);
+    } else if (name === "double") {
+      tone(700, 0.1, "triangle", v, 0);
+      tone(700, 0.15, "triangle", v, 0.18);
+    } else {
+      tone(880, 0.2, "sine", v, 0);
+    }
+  }
+
+  function modeCfg() {
+    if (mode === "stopwatch") {
+      return {
+        showMs: $("sw-showMs").checked,
+        soundOn: $("sw-soundOn").checked,
+        flashOn: false,
+        tickOn: $("sw-tickOn").checked,
+        sound: $("sw-sound").value,
+        volume: $("sw-volume").value,
+        label: $("sw-label").value || "Stopwatch"
+      };
+    }
+    if (mode === "pomodoro") {
+      return {
+        showMs: $("pm-showMs").checked,
+        soundOn: $("pm-soundOn").checked,
+        flashOn: $("pm-flashOn").checked,
+        tickOn: $("pm-tickOn").checked,
+        sound: pomoWork ? $("pm-soundWork").value : $("pm-soundBreak").value,
+        volume: $("pm-volume").value,
+        label: pomoWork ? ($("pm-labelWork").value || "Work") : ($("pm-labelBreak").value || "Break")
+      };
+    }
+    return {
+      showMs: $("cd-showMs").checked,
+      soundOn: $("cd-soundOn").checked,
+      flashOn: $("cd-flashOn").checked,
+      tickOn: $("cd-tickOn").checked,
+      sound: $("cd-sound").value,
+      volume: $("cd-volume").value,
+      label: $("cd-label").value || "Countdown"
+    };
+  }
+
+  function cdTotalMs() {
+    const h = Math.max(0, Number($("cd-hours").value) || 0);
+    const m = Math.max(0, Number($("cd-minutes").value) || 0);
+    const s = Math.max(0, Number($("cd-seconds").value) || 0);
+    const ms = Math.min(999, Math.max(0, Number($("cd-ms").value) || 0));
+    return ((h * 3600) + (m * 60) + s) * 1000 + ms;
+  }
+
+  function pmTotalMs(work) {
+    const mins = work
+      ? (Number($("pm-workMin").value) || 25)
+      : (Number($("pm-breakMin").value) || 5);
+    const ms = Math.min(999, Math.max(0, Number($("pm-ms").value) || 0));
+    return mins * 60 * 1000 + ms;
+  }
+
+  function format(ms, showMs) {
+    const neg = ms < 0;
+    ms = Math.max(0, Math.abs(ms));
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const milli = Math.floor(ms % 1000);
+    let core = h > 0
+      ? `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
+      : `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    if (showMs) core += `.${String(milli).padStart(3,"0")}`;
+    return (neg ? "-" : "") + core;
+  }
+
+  function setDisplay(ms) {
+    const cfg = modeCfg();
+    display.textContent = format(ms, cfg.showMs);
+    display.classList.toggle("danger", mode !== "stopwatch" && ms <= 0);
+  }
+
+  function applyTheme() {
+    document.documentElement.style.setProperty("--bg", $("bgColor").value);
+    document.documentElement.style.setProperty("--panel", $("panelColor").value);
+    document.documentElement.style.setProperty("--display", $("textColor").value);
+    document.documentElement.style.setProperty("--accent", $("accentColor").value);
+    document.documentElement.style.setProperty("--display-size", $("fontSize").value + "px");
+    document.documentElement.style.setProperty("--font", $("fontPick").value);
+    document.body.style.fontFamily = $("fontPick").value;
+    $("sizeVal").textContent = $("fontSize").value;
+    labelShow.textContent = modeCfg().label;
+  }
+
+  function alarm() {
+    const cfg = modeCfg();
+    if (cfg.flashOn) {
+      document.body.classList.remove("flash");
+      void document.body.offsetWidth;
+      document.body.classList.add("flash");
+    }
+    if (cfg.soundOn) playPattern(cfg.sound, cfg.volume);
+  }
+
+  function enterFocusMode() {
+    document.body.classList.add("focus-mode");
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  }
+  function exitFocusMode() {
+    document.body.classList.remove("focus-mode");
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  }
+
+  function setMode(next) {
+    mode = next;
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.mode === mode));
+    document.querySelectorAll(".mode-panel").forEach(p => p.classList.remove("active"));
+    $("panel-" + mode).classList.add("active");
+    stop(true);
+  }
+
+  function tick() {
+    if (!running) return;
+    const now = performance.now();
+    const cfg = modeCfg();
+
+    if (mode === "stopwatch") {
+      const ms = swElapsed + (now - swStarted);
+      setDisplay(ms);
+      if (cfg.tickOn) {
+        const sec = Math.floor(ms / 1000);
+        if (window._lastSec !== sec) {
+          window._lastSec = sec;
+          if (sec > 0) playPattern("digital", Math.min(40, Number(cfg.volume)));
+        }
+      }
+      raf = requestAnimationFrame(tick);
+      return;
+    }
+
+    const left = endAt - now;
+    setDisplay(left);
+
+    if (cfg.tickOn) {
+      const sec = Math.ceil(left / 1000);
+      if (window._lastSec !== sec) {
+        window._lastSec = sec;
+        if (sec > 0) playPattern("digital", Math.min(35, Number(cfg.volume)));
+      }
+    }
+
+    if (left <= 0) {
+      setDisplay(0);
+      alarm();
+
+      // Countdown repeat
+      if (mode === "countdown" && $("cd-repeat").checked) {
+        remainMs = cdTotalMs() || 1000;
+        endAt = performance.now() + remainMs;
+        sub.textContent = "Repeating…";
+        window._lastSec = null;
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+
+      running = false;
+      $("startBtn").disabled = false;
+      $("pauseBtn").disabled = true;
+      sub.textContent = "Done!";
+
+      if (mode === "pomodoro" && $("pm-autoNext").checked) {
+        pomoWork = !pomoWork;
+        remainMs = pmTotalMs(pomoWork);
+        applyTheme();
+        sub.textContent = pomoWork ? "Next: work — press Start" : "Next: break — press Start";
+        setDisplay(remainMs);
+      }
+      return;
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function start() {
+    if (running) return;
+    enterFocusMode();
+    applyTheme();
+
+    if (mode === "stopwatch") {
+      if (modeCfg().soundOn) playPattern(modeCfg().sound, modeCfg().volume);
+      swStarted = performance.now();
+      running = true;
+      $("startBtn").disabled = true;
+      $("pauseBtn").disabled = false;
+      sub.textContent = "Running";
+      window._lastSec = null;
+      raf = requestAnimationFrame(tick);
+      return;
+    }
+
+    if (mode === "countdown") remainMs = cdTotalMs() || remainMs;
+    if (mode === "pomodoro" && remainMs <= 0) remainMs = pmTotalMs(pomoWork);
+    if (remainMs <= 0) remainMs = mode === "pomodoro" ? pmTotalMs(true) : (cdTotalMs() || 1000);
+
+    endAt = performance.now() + remainMs;
+    running = true;
+    $("startBtn").disabled = true;
+    $("pauseBtn").disabled = false;
+    sub.textContent = "Running";
+    window._lastSec = null;
+    raf = requestAnimationFrame(tick);
+  }
+
+  function pause() {
+    if (!running) return;
+    running = false;
+    if (raf) cancelAnimationFrame(raf);
+    if (mode === "stopwatch") {
+      swElapsed += performance.now() - swStarted;
+      setDisplay(swElapsed);
+      if (modeCfg().soundOn) playPattern(modeCfg().sound, modeCfg().volume);
+    } else {
+      remainMs = Math.max(0, endAt - performance.now());
+      setDisplay(remainMs);
+    }
+    $("startBtn").disabled = false;
+    $("pauseBtn").disabled = true;
+    sub.textContent = "Paused";
+  }
+
+  function stop(resetDisplay = true) {
+    running = false;
+    if (raf) cancelAnimationFrame(raf);
+    $("startBtn").disabled = false;
+    $("pauseBtn").disabled = true;
+    if (!resetDisplay) return;
+    if (mode === "stopwatch") {
+      swElapsed = 0;
+      setDisplay(0);
+    } else if (mode === "pomodoro") {
+      pomoWork = true;
+      remainMs = pmTotalMs(true);
+      setDisplay(remainMs);
+    } else {
+      remainMs = cdTotalMs();
+      setDisplay(remainMs);
+    }
+    applyTheme();
+    sub.textContent = "Reset";
+  }
+
+  function saveSettings() {
+    const data = {
+      mode,
+      look: {
+        bg: $("bgColor").value, panel: $("panelColor").value,
+        text: $("textColor").value, accent: $("accentColor").value,
+        size: $("fontSize").value, font: $("fontPick").value
+      },
+      countdown: {
+        h: $("cd-hours").value, m: $("cd-minutes").value, s: $("cd-seconds").value, ms: $("cd-ms").value,
+        showMs: $("cd-showMs").checked, soundOn: $("cd-soundOn").checked, flashOn: $("cd-flashOn").checked,
+        tickOn: $("cd-tickOn").checked, repeat: $("cd-repeat").checked, sound: $("cd-sound").value, volume: $("cd-volume").value,
+        label: $("cd-label").value
+      },
+      stopwatch: {
+        showMs: $("sw-showMs").checked, soundOn: $("sw-soundOn").checked, tickOn: $("sw-tickOn").checked,
+        sound: $("sw-sound").value, volume: $("sw-volume").value, label: $("sw-label").value
+      },
+      pomodoro: {
+        workMin: $("pm-workMin").value, breakMin: $("pm-breakMin").value, ms: $("pm-ms").value,
+        autoNext: $("pm-autoNext").checked, showMs: $("pm-showMs").checked,
+        soundOn: $("pm-soundOn").checked, flashOn: $("pm-flashOn").checked, tickOn: $("pm-tickOn").checked,
+        soundWork: $("pm-soundWork").value, soundBreak: $("pm-soundBreak").value,
+        volume: $("pm-volume").value, labelWork: $("pm-labelWork").value, labelBreak: $("pm-labelBreak").value
+      }
+    };
+    localStorage.setItem("custom_timer_v2", JSON.stringify(data));
+    sub.textContent = "Settings saved";
+  }
+
+  function loadSettings() {
+    try {
+      const data = JSON.parse(localStorage.getItem("custom_timer_v2") || "null");
+      if (!data) return;
+      const L = data.look || {};
+      if (L.bg) $("bgColor").value = L.bg;
+      if (L.panel) $("panelColor").value = L.panel;
+      if (L.text) $("textColor").value = L.text;
+      if (L.accent) $("accentColor").value = L.accent;
+      if (L.size) $("fontSize").value = L.size;
+      if (L.font) $("fontPick").value = L.font;
+      const c = data.countdown || {};
+      if (c.h != null) $("cd-hours").value = c.h;
+      if (c.m != null) $("cd-minutes").value = c.m;
+      if (c.s != null) $("cd-seconds").value = c.s;
+      if (c.ms != null) $("cd-ms").value = c.ms;
+      if (c.showMs != null) $("cd-showMs").checked = c.showMs;
+      if (c.soundOn != null) $("cd-soundOn").checked = c.soundOn;
+      if (c.flashOn != null) $("cd-flashOn").checked = c.flashOn;
+      if (c.tickOn != null) $("cd-tickOn").checked = c.tickOn;
+      if (c.repeat != null) $("cd-repeat").checked = c.repeat;
+      if (c.sound) $("cd-sound").value = c.sound;
+      if (c.volume != null) $("cd-volume").value = c.volume;
+      if (c.label) $("cd-label").value = c.label;
+      const s = data.stopwatch || {};
+      if (s.showMs != null) $("sw-showMs").checked = s.showMs;
+      if (s.soundOn != null) $("sw-soundOn").checked = s.soundOn;
+      if (s.tickOn != null) $("sw-tickOn").checked = s.tickOn;
+      if (s.sound) $("sw-sound").value = s.sound;
+      if (s.volume != null) $("sw-volume").value = s.volume;
+      if (s.label) $("sw-label").value = s.label;
+      const p = data.pomodoro || {};
+      if (p.workMin != null) $("pm-workMin").value = p.workMin;
+      if (p.breakMin != null) $("pm-breakMin").value = p.breakMin;
+      if (p.ms != null) $("pm-ms").value = p.ms;
+      if (p.autoNext != null) $("pm-autoNext").checked = p.autoNext;
+      if (p.showMs != null) $("pm-showMs").checked = p.showMs;
+      if (p.soundOn != null) $("pm-soundOn").checked = p.soundOn;
+      if (p.flashOn != null) $("pm-flashOn").checked = p.flashOn;
+      if (p.tickOn != null) $("pm-tickOn").checked = p.tickOn;
+      if (p.soundWork) $("pm-soundWork").value = p.soundWork;
+      if (p.soundBreak) $("pm-soundBreak").value = p.soundBreak;
+      if (p.volume != null) $("pm-volume").value = p.volume;
+      if (p.labelWork) $("pm-labelWork").value = p.labelWork;
+      if (p.labelBreak) $("pm-labelBreak").value = p.labelBreak;
+      if (data.mode) setMode(data.mode);
+    } catch (e) {}
+  }
+
+  document.querySelectorAll(".tab").forEach(btn => {
+    btn.addEventListener("click", () => setMode(btn.dataset.mode));
+  });
+  $("startBtn").onclick = start;
+  $("pauseBtn").onclick = pause;
+  $("resetBtn").onclick = () => stop(true);
+  $("fsBtn").onclick = () => enterFocusMode();
+  $("backBtn").onclick = () => exitFocusMode();
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement) document.body.classList.remove("focus-mode");
+  });
+
+  document.querySelectorAll("[data-cd-preset]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const total = Number(btn.dataset.cdPreset);
+      $("cd-hours").value = Math.floor(total / 3600000);
+      $("cd-minutes").value = Math.floor((total % 3600000) / 60000);
+      $("cd-seconds").value = Math.floor((total % 60000) / 1000);
+      $("cd-ms").value = total % 1000;
+      if (!running && mode === "countdown") {
+        remainMs = total;
+        setDisplay(remainMs);
+      }
+    });
+  });
+
+  ["bgColor","panelColor","textColor","accentColor","fontSize","fontPick",
+   "cd-label","sw-label","pm-labelWork","pm-labelBreak"].forEach(id => {
+    $(id).addEventListener("input", applyTheme);
+  });
+  ["cd-showMs","sw-showMs","pm-showMs"].forEach(id => {
+    $(id).addEventListener("change", () => {
+      if (!running) {
+        if (mode === "stopwatch") setDisplay(swElapsed);
+        else setDisplay(remainMs);
+      }
+    });
+  });
+
+  $("saveTheme").onclick = saveSettings;
+  $("resetTheme").onclick = () => {
+    $("bgColor").value = "#0c0f14";
+    $("panelColor").value = "#151a22";
+    $("textColor").value = "#ffffff";
+    $("accentColor").value = "#5b9fd4";
+    $("fontSize").value = 72;
+    $("fontPick").selectedIndex = 0;
+    applyTheme();
+  };
+  $("testSound").onclick = () => {
+    const cfg = modeCfg();
+    playPattern(cfg.sound, cfg.volume);
+  };
+
+  document.addEventListener("keydown", (e) => {
+    if (e.target.matches("input, textarea, select")) return;
+    if (e.code === "Space") { e.preventDefault(); running ? pause() : start(); }
+    if (e.key === "r" || e.key === "R") stop(true);
+    if (e.key === "Escape") exitFocusMode();
+  });
+
+  loadSettings();
+  applyTheme();
+  if (mode === "countdown") {
+    remainMs = cdTotalMs() || 5 * 60 * 1000;
+    setDisplay(remainMs);
+  } else if (mode === "pomodoro") {
+    remainMs = pmTotalMs(true);
+    setDisplay(remainMs);
+  } else setDisplay(0);
+})();
+</script>
 </body>
 </html>
